@@ -2,6 +2,7 @@ package hudson.plugins.jira;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
 import hudson.Extension;
 import hudson.Util;
 import hudson.model.AbstractDescribableImpl;
@@ -181,8 +182,20 @@ public class JiraSite extends AbstractDescribableImpl<JiraSite> {
         return this;
     }
 
-    private static Cache<String, RemoteIssue> makeIssueCache() {
-        return CacheBuilder.newBuilder().concurrencyLevel(2).expireAfterAccess(2, TimeUnit.MINUTES).build();
+    private Cache<String, RemoteIssue> makeIssueCache() {
+        final CacheLoader<String, RemoteIssue> cacheLoader = new CacheLoader<String, RemoteIssue>() {
+            @Override
+            public RemoteIssue load(String key) throws Exception {
+                JiraSession session = getSession();
+                RemoteIssue issue = null;
+                if (session != null) {
+                    issue = session.getIssue(key);
+                }
+
+                return issue != null ? issue : NULL;
+            }
+        };
+        return CacheBuilder.newBuilder().concurrencyLevel(2).expireAfterAccess(2, TimeUnit.MINUTES).build(cacheLoader);
     }
 
 
@@ -376,17 +389,7 @@ public class JiraSite extends AbstractDescribableImpl<JiraSite> {
     public JiraIssue getIssue(final String id) throws IOException, ServiceException {
 
         try {
-            RemoteIssue remoteIssue = issueCache.get(id, new Callable<RemoteIssue>() {
-                public RemoteIssue call() throws Exception {
-                    JiraSession session = getSession();
-                    RemoteIssue issue = null;
-                    if (session != null) {
-                        issue = session.getIssue(id);
-                    }
-
-                    return issue != null ? issue : NULL;
-                }
-            });
+            RemoteIssue remoteIssue = issueCache.get(id);
 
             if (remoteIssue == NULL) {
                 return null;
