@@ -46,13 +46,8 @@ public class JiraRestService {
 
     private final String authHeader;
 
-    public JiraRestService(URL url, String username, String password) {
-        try {
-            this.uri = url.toURI();
-        } catch (URISyntaxException e) {
-            LOGGER.warning("jira rest client to URI error. cause: " + e.getMessage());
-            throw new RuntimeException("failed to get URI from URL: " + url);
-        }
+    public JiraRestService(URI uri, JiraRestClient jiraRestClient, String username, String password) {
+        this.uri = uri;
         this.objectMapper = new ObjectMapper();
         final String login = username + ":" + password;
         try {
@@ -62,9 +57,7 @@ public class JiraRestService {
             LOGGER.warning("jira rest encode username:password error. cause: " + e.getMessage());
             throw new RuntimeException("failed to encode username:password using Base64");
         }
-
-        jiraRestClient = new AsynchronousJiraRestClientFactory()
-                .createWithBasicHttpAuthentication(this.uri, username, password);
+        this.jiraRestClient = jiraRestClient;
     }
 
     public void addComment(String issueId, String commentBody,
@@ -296,14 +289,6 @@ public class JiraRestService {
         return Request.Get(uri)
                 .connectTimeout(TIMEOUT_IN_10_SECONDS)
                 .socketTimeout(TIMEOUT_IN_10_SECONDS)
-                .addHeader("Authorization", authHeader)
-                .addHeader("Content-Type", "application/json");
-    }
-
-    private Request buildPostRequest(URI uri) {
-        return Request.Post(uri)
-                .connectTimeout(10000)
-                .socketTimeout(10000)
                 .addHeader("Authorization", authHeader)
                 .addHeader("Content-Type", "application/json");
     }

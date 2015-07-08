@@ -1,8 +1,10 @@
 package hudson.plugins.jira;
 
+import com.atlassian.jira.rest.client.api.JiraRestClient;
 import com.atlassian.jira.rest.client.api.domain.Issue;
 import com.atlassian.jira.rest.client.api.domain.IssueType;
 import com.atlassian.jira.rest.client.api.domain.Version;
+import com.atlassian.jira.rest.client.internal.async.AsynchronousJiraRestClientFactory;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
@@ -26,6 +28,8 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.ref.WeakReference;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.*;
 import java.util.concurrent.Callable;
@@ -229,7 +233,18 @@ public class JiraSite extends AbstractDescribableImpl<JiraSite> {
         if (userName == null || password == null)
             return null;    // remote access not supported
 
-        return new JiraSession(this, new JiraRestService(url, userName, password));
+        final URI uri;
+        try {
+            uri = url.toURI();
+        } catch (URISyntaxException e) {
+            LOGGER.warning("convert URL to URI error: " + e.getMessage());
+            throw new RuntimeException("failed to create JiraSession due to convert URI error");
+        }
+
+        final JiraRestClient jiraRestClient = new AsynchronousJiraRestClientFactory()
+                .createWithBasicHttpAuthentication(uri, userName, password);
+
+        return new JiraSession(this, new JiraRestService(uri, jiraRestClient, userName, password));
     }
 
     /**
